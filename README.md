@@ -20,9 +20,9 @@ cd Quest1
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 
-# Linux / macOS:
-python3 -m venv venv
-source venv/bin/activate
+# Windows (Git Bash):
+py -m venv venv
+source venv/Scripts/activate
 
 # Install dependencies
 pip install -r requirements.txt
