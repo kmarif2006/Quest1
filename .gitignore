@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.pytest_cache/
+
+# Streamlit
+.streamlit/
+
+# Temporary media downloads, demo videos, and caches
+data/
+*.mp4
+*.wav
+*.part
+*.ytdl
+working_demo.mp4
+
+# Output frames and cached transcripts
+output/frames/
+output/transcript_*.json
+output/transcript.json

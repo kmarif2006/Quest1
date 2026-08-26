@@ -1,0 +1,369 @@
+# Prompts & Development Notes
+
+## 1. Problem Statement & Requirement Discovery
+
+I got this challenge where I need to find the exact first frame in a video where a given dialogue appears. Before thinking about implementation, can we first break down what exactly this problem means and what could make it difficult? I don't want to directly jump into OCR or some ML model without understanding the cases properly.
+
+One thing I am not fully clear about is what they mean by "dialogue appears". Does it necessarily mean subtitle text, or can it also be some text shown inside the video like a board, title, location name, chat message etc? Because if it is only subtitles the problem becomes very different.
+
+So if the target can be either spoken, shown as subtitles, or just visually present somewhere in the frame, then audio/transcript alone cannot solve everything right? Can you list the main cases we need to handle and also cases where one signal may exist but another won't?
+
+For example one edge case I am thinking of is that the dialogue is spoken in audio but there are no subtitles visible on screen. Another case could be the opposite, where some text is visible on a board but is never spoken. Are there more cases like this that could break a simple solution?
+
+The challenge asks for the first occurrence. That means even if the same line appears again later, once we find the earliest valid one we should not continue searching right? But how do we make sure we don't stop too early because of some bad OCR or ASR match?
+
+Actually, my current plan is to use whatever metadata is available in the video to help locate the target. Transcript could be the main cheap signal, and if that is not available we could use the audio to generate transcript blocks. Since we need the first occurrence, I also think we need some similarity check instead of directly rejecting a candidate because one or two words differ. Before going further, explain the key terms involved here like OCR, ASR and Whisper so I understand how each part fits.
+
+What exactly is meant by on-screen dialogue? Does it mean the target must be visibly present in the frame, even if it is not spoken, or can the challenge also consider spoken dialogue that is not rendered as text?
+
+Even though transcripts and Whisper can be useful, we cannot fully rely on them. A target could be something like a shop name, location board or title that is visible in the video but never spoken and never appears in the transcript.
+
+Currently the test video they gave contained the target in the audio, and there was no corresponding on-screen text. So I think "dialogue appears" in this challenge does not necessarily mean the words have to be visible in the video image at the moment they are spoken.
+
+Do you have another approach that you think would work better? Point out the areas I may not be considering instead of just agreeing with my idea, so we can build something more reliable.
+
+Right now we have collected several edge cases and strategies. Can you summarize them compactly, preferably in a table, without missing cases like audio being present while visible text is absent?
+
+Before implementation, summarize the strategies and edge cases we have identified in a compact form. I mainly want to make sure we haven't forgotten cases like spoken dialogue with no visible text, visible text with no audio, bad subtitles, ASR errors, repeated dialogue, short-lived text, variable FPS and remote media failures.
+
+
+## 2. Tool & Technology Exploration
+
+Also explain the main terms we are using here because I want to understand the components properly. What exactly are OCR, ASR, subtitles/captions, FFmpeg, FFprobe, Whisper etc, and where would each one fit in this problem?
+
+You mentioned Whisper for audio. Is Whisper basically a library/model that converts speech into transcript with timestamps? If it already gives timestamps, won't that simplify the problem because we could first locate the spoken dialogue and only inspect frames around that time?
+
+I found yt-dlp while looking at ways to download videos from YouTube and other media sites. Can I just use this for getting the input video from a URL, or is there any issue with relying on it? I also need this to work for sites other than YouTube if possible.
+
+I also saw that yt-dlp can download audio-only and subtitles separately. If that's true, maybe we don't even need to download the whole video first. Could we initially fetch metadata, subtitles and audio, and only get video data later if needed?
+
+Can yt-dlp also give subtitles or captions, or do I need another library for that? If subtitles are available, I feel like searching them first may be much cheaper than running speech recognition on the whole audio.
+
+I keep seeing FFmpeg being used together with yt-dlp. What exactly would FFmpeg do here that yt-dlp doesn't already do?
+
+From what I understand, yt-dlp can get the media, while FFmpeg can manipulate it, like extracting audio, cutting a small segment, converting formats or extracting frames. Is that the correct separation?
+
+If FFmpeg can also extract frames, do we really need OpenCV? I was thinking of using OpenCV because frame-by-frame access in Python looks much easier.
+
+I saw FFmpeg being used in a lot of video projects. Do I really need it here if I am already using OpenCV? I thought OpenCV can open the video, seek to timestamps and extract frames, so I'm not sure what FFmpeg gives me additionally.
+
+From what I understand now, maybe I should use FFmpeg for things like audio extraction and cutting video segments, and OpenCV only when I actually want to iterate through frames in Python. Is that a reasonable split, or am I unnecessarily using two tools?
+
+I also found GStreamer while searching for media pipelines. It looks much more powerful. Is it worth using here, or is it overkill for a small offline search application?
+
+I am currently planning to get FPS, duration and frame count from OpenCV. But I read that OpenCV metadata can sometimes be unreliable, especially with variable frame rate videos. Should we use FFprobe instead?
+
+For OCR my first thought was Tesseract because that is the one I know. Is Tesseract good enough for subtitles and text inside video frames?
+
+PaddleOCR looks stronger, but it also seems heavier. Since I may already have Whisper loaded, could memory become an issue? My laptop only has around 8 GB RAM.
+
+For ASR I found normal Whisper and also faster-whisper. People say faster-whisper uses CTranslate2 and is much lighter on CPU. Can you explain whether it actually makes sense here or if I should just use original Whisper?
+
+I don't have a GPU available for this. If I use faster-whisper on CPU with INT8 and maybe a smaller English model, will it still be accurate enough for locating the dialogue? I don't need perfect transcription of the whole video, only enough to find the target region.
+
+For finding spoken dialogue I am thinking of using Whisper because it seems pretty reliable. Is the normal OpenAI Whisper package fine for local use, or is there a better implementation for CPU?
+
+For matching I first thought of just lowercasing and comparing strings, but OCR and Whisper are probably going to produce slightly different text. I found RapidFuzz while searching. Would that be suitable here?
+
+There are multiple scores like ratio, partial ratio and token set ratio. Which one makes the most sense for dialogue matching? Or should we combine them somehow?
+
+I also thought about sentence embeddings, but I feel like semantic similarity may be dangerous here because two different sentences could have similar meaning. Since we are locating a specific dialogue, lexical similarity probably matters more, right?
+
+Before we start implementing this properly, I want to decide the language. I am comfortable with both Go and Python. Go would give cleaner concurrency and binaries, but most OCR/ASR/ML tooling seems Python-first. Can you compare Python vs Go specifically for this project?
+
+I need a detailed comparison of Python vs Go for this project, including the main advantages and disadvantages of each. Based on the requirements, which one would you choose and why?
+
+I think Python is probably the practical choice because faster-whisper, PaddleOCR, OpenCV and the ML ecosystem are already mature there. Do you see any strong reason to choose Go instead, or would that just make model integration harder?
+
+List down all the tools we are using for the different responsibilities in the system, such as metadata extraction, transcript handling, audio acquisition, video processing, OCR and ASR.
+
+Make sure that for each video we create a directory and keep its related files together. Also, for tools like Whisper that have multiple model sizes, choose options that will not overwhelm the laptop. The machine has around 8 GB RAM, 512 GB SSD and a Ryzen 7 with integrated graphics.
+
+
+## 3. Architecture Exploration & Design Doubts
+
+My first idea is very simple: download the full video, go frame by frame, run OCR on every frame, compare the extracted text with the target, and return the first match. This should work logically, but I feel like it will be very expensive. We should look for ways to use other signals to reduce the amount of work.
+
+Actually I was thinking maybe the metadata already available with the video can help us before touching the frames. Like subtitles, captions, transcript tracks, duration, FPS etc. Can we use those to reduce the search space?
+
+My current thought is that transcript/subtitle text could be the main cheap signal. If the target exists there, we get a rough timestamp almost immediately. But if there is no transcript, then maybe we use the audio and convert it into transcript blocks ourselves.
+
+If we use transcript or audio recognition, I don't want to trust exact string equality because the words may be slightly different. For example punctuation can change or speech recognition can get one word wrong.
+
+But I don't think we can fully rely on Whisper either. Suppose the target text is a shop name or location board shown in the video and nobody says it. Whisper would never find that. So maybe audio/transcripts should only help us narrow the search, while OCR remains the final fallback.
+
+If transcript or Whisper gives the first spoken occurrence at, say, 20 minutes, can we assume we don't need to OCR anything after 20 minutes because any first visual occurrence must either be before or around that?
+
+I think that assumption may fail if the text first appears visually after the spoken line, or if the audio match is not actually the same visible dialogue. So should we treat ASR timestamps as candidate windows rather than hard boundaries?
+
+At that point, maybe transcript and Whisper should be used as filtering signals rather than absolute truth. If they give us a likely first occurrence, they can reduce where we search visually, but OCR should still protect us against cases where the visible occurrence differs from the spoken one.
+
+Do you have a different approach from your side that would be more reliable? Try to point out weaknesses in what I am suggesting instead of just agreeing with it. I want something that is efficient but still defensible if they change the input.
+
+I was thinking we could just transcribe the whole audio once and then search it. That's probably the simplest. Is there a reason to process it in chunks instead?
+
+Since the challenge asks for the first occurrence, chunking chronologically sounds useful because after every chunk we can check for the target and stop early. That could save a lot of Whisper work if the dialogue is near the start. Is that worth the extra complexity?
+
+If we use 3-minute chunks, what happens when the target sentence is split exactly across a chunk boundary? Do we need overlap between chunks?
+
+If we overlap them by a few seconds, then some speech will be transcribed twice. Will that cause duplicate matches or incorrect timestamps?
+
+If subtitles are available, I think it makes no sense to run Whisper from zero. We could search subtitles first and if they say the target is around 30 minutes, only run Whisper for a small window around there. Is there any reason not to do that?
+
+The subtitle timestamp may not be perfectly synchronized though. Maybe we should take something like 5 seconds before and after the subtitle timestamp and verify with Whisper rather than trusting the subtitle timestamp directly.
+
+What should happen if this local Whisper verification fails? My first thought was to return no match, but that sounds unsafe because the subtitle could simply be wrong. Should we fall back to normal chronological ASR from the beginning?
+
+If subtitles already contain the dialogue and timestamp, can I directly return that timestamp and frame without using ASR or OCR? I feel like that should already solve the problem in most cases.
+
+If Whisper finally tells us the dialogue is around some timestamp, why are we still downloading the whole video? Could yt-dlp or FFmpeg fetch only a small segment around that timestamp for the OCR step?
+
+So something like metadata -> subtitles -> audio -> locate target -> download maybe 5 or 10 seconds of video -> OCR only that area. And only if all of that fails do we download the complete video for full OCR. Is that practical, or are partial video downloads unreliable?
+
+I was thinking of just downloading the full video first and then doing everything locally. Is that fine, or is that going to become slow for larger videos? Since I mainly need the dialogue timestamp first, is there some way to download only audio initially and get the video part later?
+
+One issue I see is that a downloaded segment will start from timestamp 0 locally. So if the original segment is 803–810 seconds and OCR finds something at local second 3, we need to return 806 seconds, not 3. We should probably track both local and global timestamps explicitly, right?
+
+Let's say there are no subtitles and Whisper doesn't find anything. Then the only safe option is visual search across the full video. Instead of OCRing every frame, I think we should do coarse sampling first, then refine around candidates, then finally scan frame by frame. Would that cover the visual-only cases properly?
+
+For refinement I was thinking something like 2-second samples first, then around a candidate go to 0.5 sec, 0.25 sec, 0.1 sec and only then every frame. Is that too complicated, or is this a normal coarse-to-fine search idea?
+
+Another thing: if we OCR a frame once during coarse search and later revisit the same image during refinement, should we cache OCR results so we don't keep running the model on the same data?
+
+So right now we are OCRing the whole video file, or at least moving through it in batches. When we tighten the search bounds, can we reuse or cache previous OCR results instead of computing them again from scratch?
+
+Whisper is pretty slow on CPU. Can I cache the transcript of each audio chunk so that if I search another dialogue in the same video I don't have to transcribe it again?
+
+Based on everything so far, I think the system should use cheap signals first and only move to expensive visual processing when required. Something like: inspect media -> use subtitles if available -> otherwise/then ASR -> narrow to a target window -> OCR the relevant frames -> full OCR fallback if audio/transcripts don't help. Can you challenge this architecture before we start coding?
+
+I don't want us to overengineer the first version. Can we take the best parts from what I suggested and what you suggested and turn them into one practical architecture that handles the important edge cases but is still possible to build and explain?
+
+Okay, let's not complicate it more. I want the first working prototype to focus on the important edge cases and the actual target goal. Let's combine the best parts of my approach, your approach and the ideas we have discussed into one unified architecture that clearly explains what happens at each step.
+
+Right now the approach is clear: first check transcripts/subtitles, then use ASR when needed, and keep visual OCR as the fallback for cases that audio-based signals cannot solve.
+
+
+## 4. Phase-by-Phase Development
+
+### Phase 1 — Video Acquisition & Metadata
+First I want the input layer to work with both a local video file and a remote URL. For local files we should just use the path directly, and for URLs I’m thinking yt-dlp makes sense. What should our fallback be if yt-dlp fails but the URL itself points directly to an MP4?
+
+For metadata, I initially thought OpenCV would be enough, but ffprobe seems more reliable for things like FPS, duration, codec and frame count. Can we use ffprobe as the main metadata source and keep OpenCV for actual frame processing?
+
+I don’t want media downloading and metadata probing mixed everywhere in the code. Can we keep acquisition as one clean layer that gives the rest of the application a usable local media path plus metadata?
+
+What information do we really need at this stage? I think duration, width/height, FPS, frame count if available, codec and time base should be enough. Let’s avoid collecting things we won’t use.
+
+Let’s test this with the OK.ru sample before moving on. I want to confirm that a remote video can be resolved/downloaded and that the metadata we print actually matches the media.
+
+
+### Phase 2 — Frame Access & Seeking
+Now that we can get a usable video, the next thing is frame access. I think we need both “give me the frame around this timestamp” and “iterate through frames in a range.” Should those use the same backend or should FFmpeg handle targeted extraction while OpenCV handles sequential reading?
+
+I’m a little unsure how exact OpenCV seeking is. If we jump to a timestamp, does it actually land there or jump to a nearby keyframe and decode from there? I want timestamps to remain the main reference and frame numbers mainly for reporting.
+
+Let’s implement timestamp-based frame access first and keep frame-number conversion as a supporting utility. That feels safer than building everything around frame indexes.
+
+We’ll eventually scan ranges of frames during OCR, so I want sequential access to be efficient and avoid reopening the video for every frame.
+
+Before adding OCR, let’s extract and save a few frames from known timestamps and inspect them. I want to know the frame layer is correct first.
+
+
+### Phase 3 — OCR Integration
+Now let’s bring in OCR. I’d like to start with PaddleOCR because it seems better suited for subtitle-style text than Tesseract, but I don’t want the rest of the codebase tied directly to Paddle.
+
+PaddleOCR returns boxes, text and confidence in its own nested structure. Can we normalize that into a simple result type so later search logic only deals with our own objects?
+
+What should we do with confidence initially? I don’t want to reject weak OCR too aggressively because coarse search may still benefit from partially recognized text.
+
+I also want OCR initialization to be lazy because loading Paddle every time the program starts would be wasteful when ASR eventually becomes the main path.
+
+Let’s test OCR first on a synthetic image where we know the exact text, then one real video frame. No search logic yet.
+
+
+### Phase 4 — Text Normalization & Fuzzy Matching
+Exact string comparison obviously won’t survive OCR and ASR mistakes, so let’s make matching its own layer instead of mixing it into OCR code.
+
+For normalization I’m thinking lowercase, punctuation cleanup and collapsing whitespace. What should we do with apostrophes and contractions so "can't" and "cant" don’t become unnecessarily different?
+
+RapidFuzz gives us several useful scores like ratio, partial ratio and token-set ratio. Rather than picking one blindly, can we compare how they behave on the kinds of errors we actually expect?
+
+Let’s build examples for exact text, punctuation differences, one wrong word, extra words, missing words and completely unrelated text. I want thresholds to come from those examples rather than arbitrary numbers.
+
+We probably need different confidence levels later—something permissive for coarse search and stricter for final acceptance. Let’s design the matcher so it can support that without duplicating logic.
+
+
+### Phase 5 — Coarse Video Sampling
+Now I want the first complete visual search working, even if it isn’t optimal yet. My idea is to sample the video every couple of seconds and OCR those frames in chronological order.
+
+I don’t think the coarse stage should pretend it knows the exact answer. It should identify candidate regions that look promising and let later stages refine them.
+
+Since the challenge wants the first occurrence, should we keep candidates chronologically instead of just sorting everything by similarity? I don’t want a later stronger match hiding an earlier valid one.
+
+If a sampled frame crosses the lower similarity threshold, let’s turn that into a padded time window around the frame rather than just storing one timestamp.
+
+While debugging, let’s only search the first few minutes so we can verify candidate generation without waiting for OCR across an entire movie.
+
+
+### Phase 6 — Candidate Window Refinement
+Coarse search only tells us roughly where the dialogue might be, so now I want to narrow those windows instead of rescanning the whole video.
+
+I was thinking we progressively tighten the sampling, maybe around 0.5 seconds, then 0.25, then 0.1. Does that give a reasonable balance between speed and precision?
+
+If refinement doesn’t produce a much stronger match, I don’t think we should immediately throw the candidate away. Maybe keep the best evidence as a fallback and let the exact stage decide.
+
+We need guard bands around the refined area because OCR timing can fluctuate between nearby frames. Let’s avoid narrowing so aggressively that we cut off the true first frame.
+
+Also make the searched intervals visible in diagnostics. I want to be able to prove that refinement stayed inside the candidate window instead of accidentally scanning the whole video again.
+
+
+### Phase 7 — Exact First-Frame Search
+Now that refinement gives us a very small region, this is where I want to finally scan every frame and find the exact first matching one.
+
+We discussed two meanings of “first frame”: the first partial appearance of the text and the first frame where the full dialogue is visible. I think complete-dialogue should be the default for the challenge, while supporting both internally.
+
+So if one frame contains only part of the sentence and a later frame contains the full line, complete mode should return the later frame rather than the first weak OCR signal.
+
+Let’s preserve both the first evidence frame and first complete match internally because that could be useful when explaining the behavior.
+
+Once the final frame is found, save it automatically. The challenge explicitly asks for the corresponding image, so this should be part of the normal result rather than a separate command.
+
+
+### Phase 8 — Subtitle & Transcript Ingestion
+Now that the OCR path works end to end, I want to add a cheaper path before it rather than changing the OCR implementation.
+
+Can we inspect the media for subtitles or captions first and normalize whatever we find into one timed transcript format, regardless of whether the original source is VTT, SRT or something else?
+
+Subtitle lines often split one sentence into multiple cues. If we compare each cue independently, we could miss the target. I think we should allow nearby cues to be grouped before matching.
+
+I only want subtitles to tell us where to look. Their timestamps can be inaccurate, so they should provide a candidate time rather than directly becoming the final answer.
+
+Let’s test both a video with useful subtitles and one without them so we know this new path doesn’t interfere with the existing OCR fallback.
+
+
+### Phase 9 — ASR Integration
+For videos where subtitles don’t help, we now need speech recognition. Let’s integrate faster-whisper first without changing the search strategy yet.
+
+Since I’m running this locally on CPU with limited RAM, I think base.en with int8 is a reasonable starting point. I care more about stable dialogue localization than using a huge model.
+
+I definitely want word-level timestamps because later we need the start of the actual phrase, not just the start of a whole Whisper segment.
+
+Can we normalize Whisper output into our own segment and word objects instead of letting faster-whisper objects leak through the codebase?
+
+Also let’s add an ASR cache immediately. Re-running Whisper on the same audio every time we tune matching logic would waste a lot of time.
+
+
+### Phase 10 — Guided & Chunked ASR Search
+Now let’s actually search the audio. If we don’t have a useful subtitle hint, I don’t want to transcribe the entire movie before checking for the target. Let’s process it chronologically in chunks.
+
+Around three-minute chunks with a small overlap seems reasonable. After each chunk, run the phrase matcher and stop once we have the first trusted occurrence.
+
+Whisper may split the target across multiple words or segments, so comparing only whole segments feels too restrictive. Can we build phrase windows based roughly on the target word count?
+
+If subtitles already gave us a candidate timestamp, I want ASR to use that as guidance but never depend on it completely. A bad subtitle timestamp should not make us miss an earlier spoken occurrence.
+
+Let’s test a phrase near a chunk boundary too, because the overlap only matters if we can prove a dialogue split between chunks is still detected correctly.
+
+
+### Phase 11 — Result Resolution
+ASR can now tell us where the spoken dialogue occurs, but the challenge still wants a frame image. Let’s connect the ASR timestamp back to the video result.
+
+I think there are really two cases: if speech alone is enough, take the video frame around the ASR timestamp; if the use case specifically needs visible dialogue, do a small visual search around that region. Does that separation make sense?
+
+Important case: if Whisper clearly finds the spoken line but OCR around that timestamp sees no text, I don’t want the system to return no match. Spoken dialogue should remain valid.
+
+Let’s keep timestamp as the primary result and derive frame number from the video metadata only for reporting.
+
+Also, Whisper and PaddleOCR are both heavy. If we ever need OCR after ASR, can we release Whisper resources first so the application stays stable on limited RAM?
+
+
+### Phase 12 — Visual Fallback Integration
+Now let’s connect the OCR pipeline back as the real fallback. If ASR genuinely finds no trusted dialogue, only then should we pay the cost of whole-video OCR.
+
+I don’t want another OCR implementation here. Reuse the coarse -> refine -> exact flow we already built and just call it from the main search service.
+
+One thing I noticed is the same frame might get OCR’d more than once during coarse and refinement stages. Can we cache OCR results by the actual image content so repeated calls are avoided?
+
+Also make sure a successful ASR result never triggers full-video OCR just because visible text wasn’t detected. Full OCR is for “ASR did not find the dialogue,” not “ASR found it but there were no subtitles.”
+
+Let’s test a true ASR-miss case and confirm the fallback reaches the exact-frame OCR result correctly.
+
+
+### Phase 13 — Progressive Media Streaming
+One big inefficiency now is that remote URLs can still make us download too much media before we know which stage actually needs it. I want acquisition to happen progressively instead.
+
+My current thought is: inspect metadata first, check subtitles, acquire audio for ASR, and only after ASR finds a timestamp fetch the small video portion needed for the result. Full video should only be required if we reach whole-video OCR.
+
+For downloaded segments, the local file starts at timestamp zero even though it came from somewhere later in the original video. We need to carry the segment’s original start time so final timestamps never accidentally become segment-relative.
+
+We already saw some WebM/VP9 segments behave poorly with OpenCV. For very small targeted segments, would it be safer to normalize them into a predictable MP4/H.264 form?
+
+Let’s verify this with a remote video and make the acquisition decisions visible in logs. I want to be able to show that the application didn’t download the full video when it only needed audio and a short target segment.
+
+
+### Phase 14 — Fast-Path Verification
+The progressive flow works, but if subtitles already give us a strong location hint we are still doing more ASR than necessary. I want a real fast path for that case.
+
+My idea is to run Whisper only on a small window around the transcript timestamp first. If that verifies the target, stop immediately; if it fails, then fall back to the normal chronological ASR from the beginning.
+
+I want the execution mode visible because it will help during testing and explanation. Something simple like local verification, chronological search and cache reuse would be enough.
+
+The ASR cache should stay independent of the target dialogue. Changing the query or fuzzy threshold should not make Whisper retranscribe the same audio.
+
+Let’s verify three separate cases: no transcript so chronological search, transcript-guided local verification, and a repeated search that should reuse cached ASR work.
+
+
+### Phase 15 — Format & Stream Selection
+One thing I noticed is that our current remote acquisition can still become very expensive. In the OK.ru case, bestaudio/best ended up selecting a muxed stream because there was no real audio-only track. Instead of trusting those generic selectors, can we inspect the available formats first and deliberately choose the cheapest stream that actually contains usable audio?
+
+I don’t want this optimization to affect the detection logic we already built. Transcript search, ASR matching, OCR fallback and result resolution are already working. Would it make sense to put all of this behind a MediaSource layer so the rest of the application just asks for things like an audio range, audio chunks or a frame without caring whether the source is local or remote?
+
+I had another doubt about ffmpeg -vn. If the source is muxed, we may still be downloading the video bytes before FFmpeg discards them, right? If that’s true, then the real saving has to come from choosing a low-bandwidth muxed representation and only requesting the part of the media we actually need.
+
+I also don’t want us building separate acquisition logic for YouTube, OK.ru and every other provider. Since yt-dlp already handles site extraction, I think RemoteMediaSource and LocalMediaSource should be enough, with yt-dlp and FFmpeg hidden behind them. Can we keep it provider-independent like that?
+
+Remote access also seems like something we should be careful with. Can we face problems because of network issues, and do all websites actually allow this kind of streaming or range access? I want the existing audio download path to remain as a fallback if remote access does not work, and the logs should clearly show whether we really used remote range access or had to download locally.
+
+So for this phase, let’s keep the scope to acquisition only: inspect formats properly, prefer true audio-only when available, otherwise use the cheapest audio-containing muxed format, keep visual selection separate from audio, expose range/chunk/frame operations through MediaSource, and preserve the old local path as the final reliability fallback. Don’t change Whisper, OCR or matching behavior yet.
+
+
+### Phase 16 — Sequential Chunk Optimization
+Now that Phase 15 can give us audio ranges and chunks without requiring the whole media first, I want ASR to actually take advantage of that. Instead of downloading a large audio file and then splitting it, can we fetch one chunk, run Whisper immediately, check for the target, and only request the next chunk if we still need it?
+
+For transcript-guided searches, I don’t think we should start from the beginning if we already have a likely timestamp. My idea is to verify only a small window around the transcript time first. If Whisper confirms it, stop there. If not, then go back to the normal chronological search from zero so that a bad transcript hint can’t hide an earlier occurrence.
+
+I was thinking whether parallel chunks would make this faster, but since we need the first occurrence it feels wasteful. If the dialogue is in the first chunk, downloading chunks 2 and 3 in parallel just wastes bandwidth. So I’d rather keep the existing three-minute chunks and overlap, but process them strictly one after another.
+
+One thing I want to double-check is early stopping. If we find the dialogue and return from the loop, could FFmpeg or yt-dlp still continue downloading in the background? I want finding a trusted match to stop the actual remote acquisition too, not just the Python search loop.
+
+I also want to keep matching responsibilities where they already are. so progressive ASR should simply stop when the matcher says the result is trusted. Also reuse the current ASR cache instead of creating a new cache just for remote chunks.
+
+So finally, a transcript hint should mean small focused Whisper verification first; otherwise start from zero and acquire one chronological audio chunk at a time. After each chunk, run Whisper and match immediately. Stop everything once the first trusted result is found. If remote acquisition fails, fall back locally rather than treating that as NO_MATCH, and if ASR genuinely finds nothing, keep the OCR fallback unchanged.
+
+
+### Phase 17 — Targeted Video Clipping & Quality Policy
+Now that audio acquisition is much more efficient, I think the video side is the next obvious bottleneck. If ASR already gives us the exact timestamp, are we still downloading much more video than necessary just to return one frame? I want this phase to avoid that.
+
+For an ASR success, I think the first attempt should simply be extracting the frame at that timestamp directly. If remote seeking doesn’t work, maybe fetch only a few seconds around it and extract the frame locally from that tiny segment. I don’t want a failed direct seek to immediately trigger a full-video download.
+
+I also realized the cheapest stream for ASR may be terrible for OCR. Something like 144p is fine if we only care about audio, but it could be useless for reading subtitles. So I think audio and visual acquisition need separate format-selection policies rather than trying to reuse the same stream.
+
+For OCR fallback, instead of hard-coding something like 360p or 720p, can we choose the cheapest format that is still realistically readable by OCR? Then if coarse OCR finds a candidate region, we can spend more bandwidth only on a small higher-quality segment around that region for refinement and exact-frame search.
+
+What if the first OCR-quality representation is just too blurry and finds nothing? I don’t want one low-quality miss to immediately become NO_MATCH, but I also don’t want to try every quality available. Maybe allow one controlled higher-quality retry and make sure the lower-resolution OCR cache doesn’t incorrectly block the retry.
+
+The final flow I want is: trusted ASR result -> targeted frame first -> tiny segment fallback if needed. Only if ASR genuinely fails do we enter OCR. For OCR, use the cheapest OCR-viable visual source for coarse search, then fetch only a small higher-quality candidate segment for refinement and exact-frame detection. Keep full-video acquisition as the last fallback and leave all the existing OCR search logic unchanged.
+
+
+### Phase 18 — Minimalist Frontend & Interaction Flow
+Now that the core search pipeline is working, I want to add a very lightweight UI around it. The frontend should only take the video URL and target dialogue, call the search backend we already have, and display the result.
+
+For the result, I want the UI to focus on exactly what the challenge asks for like timestamp, frame number where available, extracted dialogue text, and the corresponding frame image. Detection source or similarity can be shown as secondary information, but the required output should remain the main focus.
+
+Since searches can take some time, we should make the running state clear with a simple loading phase telling video extracted, applying transcript source, falling back to ASR, fallback to OCR, and once the search finishes, handle found, no_match and failed cleanly without exposing internal stack traces.
+
+I also want a proper "Search Again" flow. After any completed search, keep the current result visible until the user chooses search again. Then clear the result state, make the inputs editable again and allow another search without refreshing the whole page.
+
+Before sending anything to the media pipeline, validate the inputs properly. The URL should be a valid http/https URL or local file path, and the dialogue should not be empty or whitespace-only. At the same time, don’t make dialogue validation too restrictive because valid targets may contain punctuation, numbers or non-English unicode text. Keep validation on both the frontend and backend since client-side validation can be bypassed.
+
+Keep this phase strictly as a presentation layer over the existing system. Preserve the CLI and current search behavior, reuse the existing frame-serving/API routes where possible, and add focused tests for valid results, invalid inputs, no_match/failed states, duplicate search prevention and search again.

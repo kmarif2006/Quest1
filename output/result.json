@@ -1,0 +1,20 @@
+{
+    "status": "success",
+    "video_url": "https://ok.ru/video/248244667877",
+    "target_dialogue": "My mind rebels at stagnation",
+    "detected_dialogue": "My mind rebels at stagnation. Give me problems. Give me work.",
+    "candidate_start_seconds": 321.4,
+    "candidate_end_seconds": 332.95,
+    "refined_start_seconds": 324.42,
+    "refined_end_seconds": 327.70000000000005,
+    "timestamp": "00:05:24.420",
+    "frame_number": 7778,
+    "confidence": 0.9215,
+    "uncertainty_ms": 227.5,
+    "frame_image": "output\\result_frame.png",
+    "methods": {
+        "transcription": "faster-whisper/small",
+        "alignment": "retranscribe_short_clip",
+        "frame_mapping": "sequential_decode_pyav"
+    }
+}

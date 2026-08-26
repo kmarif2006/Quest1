@@ -1,0 +1,22 @@
+﻿# Core pipeline dependencies
+faster-whisper>=1.0.0
+opencv-python>=4.8.0
+numpy>=1.24.0
+rapidfuzz>=3.0.0
+yt-dlp>=2024.1.1
+av>=12.0.0
+pillow>=10.0.0
+
+# Frontend
+streamlit>=1.30.0
+
+# Testing
+pytest>=7.0.0
+
+# Optional: OCR verification (not required for default pipeline)
+# easyocr>=1.7.0
+
+# Notes:
+# - FFmpeg must be installed separately and available on PATH
+# - Windows: download from https://ffmpeg.org/download.html
+# - Install in venv: pip install -r requirements.txt
