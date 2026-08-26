@@ -12,7 +12,7 @@ Ensure you have **Python 3.9+** and **FFmpeg** installed.
 
 ```bash
 # Clone the repository
-git clone <repo_url>
+git clone https://github.com/kmarif2006/Quest1
 cd Quest1
 
 # Create and activate virtual environment
