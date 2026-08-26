@@ -93,8 +93,6 @@ Outputs produced:
 
 Watch the full end-to-end video pipeline in action (Streamlit UI, fast audio-only streaming, Whisper ASR, phonetic refinement, and exact frame extraction):
 
-[![Watch Working Demo](https://img.shields.io/badge/Google%20Drive-Watch%20Working%20Demo%20Video-red?style=for-the-badge&logo=googledrive&logoColor=white)](https://drive.google.com/file/d/1PkaNzGUIzrPb10iPDpJX3YFro9LjIYLo/view?usp=sharing)
-
 > 🔗 **Direct Video Link:** [https://drive.google.com/file/d/1PkaNzGUIzrPb10iPDpJX3YFro9LjIYLo/view?usp=sharing](https://drive.google.com/file/d/1PkaNzGUIzrPb10iPDpJX3YFro9LjIYLo/view?usp=sharing)
 > 
 > *The demonstration shows running the benchmark input (`https://ok.ru/video/248244667877`, dialogue: `"My mind rebels at stagnation"`), real-time log progression across all 9 pipeline stages, audio streaming optimization, and verified sub-second frame extraction.*
