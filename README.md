@@ -89,7 +89,7 @@ Outputs produced:
 
 ---
 
-## 🎬 Working Demo & Proof of Execution
+## Working Demo & Proof of Execution
 
 Watch the full end-to-end video pipeline in action (Streamlit UI, fast audio-only streaming, Whisper ASR, phonetic refinement, and exact frame extraction):
 
